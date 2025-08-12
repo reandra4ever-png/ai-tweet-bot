@@ -20,6 +20,7 @@ if not firecrawl_api_key or not serpapi_key:
 
 HISTORY_FILE = "tweet_history.json"
 TRUSTED_FILE = "trusted_domains.json"
+DAILY_NEW_DOMAIN_CAP = 3  # Max new domains per run
 
 SEARCH_QUERIES = [
     "Agentic AI",
@@ -29,10 +30,9 @@ SEARCH_QUERIES = [
     "free AI certificates"
 ]
 
-# Base trusted domains
 BASE_TRUSTED = [
     "medium.com",
-    "huggingface.co",
+    "udemy.com",
     "deeplearning.ai",
     "classcentral.com",
     "edx.org",
@@ -60,7 +60,6 @@ def save_history(history):
     save_json(HISTORY_FILE, history)
 
 def load_trusted():
-    # Merge base trusted list with learned trusted list
     learned = load_json(TRUSTED_FILE, [])
     return list(set(BASE_TRUSTED + learned))
 
@@ -69,7 +68,6 @@ def save_trusted(domains):
     save_json(TRUSTED_FILE, learned)
 
 def crawl_url(single_url):
-    """Crawl one page via Firecrawl /v1/crawl."""
     api_url = "https://api.firecrawl.dev/v1/crawl"
     headers = {
         "Authorization": f"Bearer {firecrawl_api_key}",
@@ -99,7 +97,6 @@ def crawl_url(single_url):
         return {}
 
 def scrape_url(single_url):
-    """Fallback to Firecrawl /v1/scrape."""
     api_url = "https://api.firecrawl.dev/v1/scrape"
     headers = {
         "Authorization": f"Bearer {firecrawl_api_key}",
@@ -137,7 +134,6 @@ def extract_domain(url):
         return ""
 
 def get_serpapi_results(query, trusted_domains):
-    """Fetch results from SerpAPI."""
     url = "https://serpapi.com/search.json"
     params = {"q": query, "api_key": serpapi_key, "num": 10}
     try:
@@ -154,7 +150,6 @@ def get_serpapi_results(query, trusted_domains):
             if domain in trusted_domains:
                 urls.append(link)
             else:
-                # First time seeing this domain, mark for review
                 print(f"✨ New candidate domain found: {domain}")
                 new_domains.add(domain)
                 urls.append(link)
@@ -169,7 +164,6 @@ def main():
     all_urls = []
     newly_trusted = set()
 
-    # Step 1: Get fresh URLs from SerpAPI
     for q in SEARCH_QUERIES:
         print(f"🔎 Searching via SerpAPI: {q}")
         urls, new_domains = get_serpapi_results(q, trusted_domains)
@@ -177,17 +171,16 @@ def main():
         all_urls.extend(urls)
         newly_trusted.update(new_domains)
 
-    # Step 2: Auto-approve new domains (smart learning)
+    # Apply cap to new domains
     if newly_trusted:
-        print(f"🧠 Learning new trusted domains: {list(newly_trusted)}")
-        trusted_domains.extend(list(newly_trusted))
+        limited_new = sorted(list(newly_trusted))[:DAILY_NEW_DOMAIN_CAP]
+        print(f"🧠 Learning {len(limited_new)} new domains today: {limited_new}")
+        trusted_domains.extend(limited_new)
         trusted_domains = sorted(set(trusted_domains))
         save_trusted(trusted_domains)
 
-    # Step 3: Deduplicate URLs
     all_urls = list(set(all_urls))
 
-    # Step 4: Crawl/Scrape each URL
     for source in all_urls:
         if source in history:
             print(f"⏭ Skipping duplicate from history: {source}")
