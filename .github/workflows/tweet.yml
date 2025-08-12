@@ -1,0 +1,25 @@
+name: AI Tweet Bot (Stealth Mode)
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Runs once daily at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1440 # keep job alive for 24 hours
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run bot for 24h
+        env:
+          FIRECRAWL_KEY: ${{ secrets.FIRECRAWL_KEY }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+        run: python main.py
+        Add GitHub Actions workflow for AI Tweet Bot
