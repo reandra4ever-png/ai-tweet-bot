@@ -36,6 +36,7 @@ BASE_TRUSTED = [
     "deeplearning.ai",
     "classcentral.com",
     "edx.org",
+    "udemy.com",
     "coursera.org",
     "towardsdatascience.com",
     "ai.googleblog.com",
