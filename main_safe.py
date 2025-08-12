@@ -58,8 +58,7 @@ def make_tweet(title, url):
 
 def main():
     queries = [
-        "Agentic AI site:medium.com OR site:huggingface.co",
-        "free AI courses site:deeplearning.ai OR site:coursera.org"
+        "https://www.deeplearning.ai/resources/free-courses/"
     ]
 
     history = load_history()
