@@ -21,4 +21,5 @@ jobs:
         env:
           FIRECRAWL_KEY: ${{ secrets.FIRECRAWL_KEY }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
-        run: python main_safe.py || true
+      - name: Run bot
+        run: python main_safe_auto_serpapi.py || true
