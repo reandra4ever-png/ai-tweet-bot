@@ -5,6 +5,9 @@ import random
 import json
 from datetime import datetime
 
+print("Firecrawl key loaded:", os.getenv("FIRECRAWL_KEY") is not None)
+print("X token loaded:", os.getenv("X_BEARER_TOKEN") is not None)
+
 # Load API keys from environment variables
 firecrawl_api_key = os.getenv("FIRECRAWL_KEY")
 bearer_token = os.getenv("X_BEARER_TOKEN")
@@ -84,3 +87,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
