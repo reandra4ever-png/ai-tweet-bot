@@ -21,4 +21,4 @@ jobs:
         env:
           FIRECRAWL_KEY: ${{ secrets.FIRECRAWL_KEY }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
-        run: python main.py || true
+        run: python main_safe.py || true
