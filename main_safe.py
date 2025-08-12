@@ -30,7 +30,7 @@ def save_history(history):
         json.dump(history, f)
 
 def get_links(query):
-    url = "https://api.firecrawl.com/v1/scrape"
+    url = "https://api.firecrawl.dev/v1/scrape"
     payload = {"query": query, "maxResults": 5}
     headers = {"Authorization": f"Bearer {firecrawl_api_key}"}
     try:
@@ -58,7 +58,9 @@ def make_tweet(title, url):
 
 def main():
     queries = [
-        "Agentic AI tutorials" site:https://www.google.com
+        "Agentic AI tutorials", 
+        "free AI courses site:https://www.coursera.org",
+        "site:https://www.coursera.org"
     ]
 
     history = load_history()
