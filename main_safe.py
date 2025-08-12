@@ -45,7 +45,7 @@ def crawl_url(single_url):
             "onlyMainContent": True,
             "removeBase64Images": True,
             "blockAds": True,
-            "formats": ["markdown"]
+            "formats": ["markdown"],
             "location": {
                 "country": "US",
                 "languages": ["en-US"]
