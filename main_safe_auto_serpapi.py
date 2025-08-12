@@ -195,9 +195,18 @@ def main():
             print(f"⚠ No usable data for {source}")
             continue
 
-        for entry in data["data"]:
-            page_title = entry.get("title", "Untitled")
-            page_url = entry.get("url", source)
+        # Handle data["data"] as a list or string
+        if isinstance(data["data"], list):
+            entries = data["data"]
+        elif isinstance(data["data"], str):
+            entries = [{"title": "Scraped Content", "url": source, "content": data["data"]}]
+        else:
+            print(f"⚠ Unexpected data type for {source}: {type(data['data'])}")
+            continue
+
+        for entry in entries:
+            page_title = entry.get("title", "Untitled") if isinstance(entry, dict) else "Scraped Content"
+            page_url = entry.get("url", source) if isinstance(entry, dict) else source
             if not page_url:
                 continue
 
@@ -210,6 +219,3 @@ def main():
             save_history(history)
 
     print(f"[{datetime.now()}] ✅ Smart auto-updating safe mode run complete. No tweets sent.")
-
-if __name__ == "__main__":
-    main()
