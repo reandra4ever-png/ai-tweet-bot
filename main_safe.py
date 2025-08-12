@@ -58,7 +58,7 @@ def make_tweet(title, url):
 
 def main():
     queries = [
-        "Agentic AI tutorials"
+        "Agentic AI tutorials" site:https://www.google.com
     ]
 
     history = load_history()
