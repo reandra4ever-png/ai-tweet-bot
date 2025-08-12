@@ -166,11 +166,11 @@ def main():
 
     print(f"📋 Initial trusted domains: {trusted_domains}")
     for q in SEARCH_QUERIES:
-    print(f"🔎 Searching via SerpAPI: {q}")
-    urls, new_domains = get_serpapi_results(q, trusted_domains)
-    print(f"   Found {len(urls)} links, new domains: {new_domains}")
-    all_urls.extend(urls)
-    newly_trusted.update(new_domains)
+        print(f"🔎 Searching via SerpAPI: {q}")
+        urls, new_domains = get_serpapi_results(q, trusted_domains)
+        print(f"   Found {len(urls)} links, new domains: {new_domains}")
+        all_urls.extend(urls)
+        newly_trusted.update(new_domains)
 
     print(f"🌐 Total unique URLs to process: {len(all_urls)}")
     # ... (rest of the function remains the same)
