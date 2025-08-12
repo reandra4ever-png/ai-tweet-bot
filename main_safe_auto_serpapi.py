@@ -165,15 +165,7 @@ def main():
     newly_trusted = set()
 
     print(f"📋 Initial trusted domains: {trusted_domains}")
-    for q in SEARCH_QUERIES:
-        print(f"🔎 Searching via SerpAPI: {q}")
-        urls, new_domains = get_serpapi_results(q, trusted_domains)
-        print(f"   Found {len(urls)} links, new domains: {new_domains}")
-        all_urls.extend(urls)
-        newly_trusted.update(new_domains)
-
     print(f"🌐 Total unique URLs to process: {len(all_urls)}")
-    # ... (rest of the function remains the same)
 
     for q in SEARCH_QUERIES:
         print(f"🔎 Searching via SerpAPI: {q}")
@@ -202,12 +194,20 @@ def main():
             print(f"⚠ No crawl data for {source}, falling back to scrape...")
             data = scrape_url(source)
 
+        if "data" not in data or not data["data"]:
+            print(f"⚠ No usable data for {source}, checking markdown fallback...")
+            markdown = data.get("markdown", "")
+            if markdown:
+                entries = [{"title": "Scraped Content", "url": source, "content": markdown}]
+            else:
+                continue
+
         if "data" not in data:
             print(f"⚠ No usable data for {source}")
             continue
 
         # Handle data["data"] as a list or string
-        if isinstance(data["data"], list):
+        elif isinstance(data["data"], list):
             entries = data["data"]
         elif isinstance(data["data"], str):
             entries = [{"title": "Scraped Content", "url": source, "content": data["data"]}]
