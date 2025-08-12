@@ -22,4 +22,3 @@ jobs:
           FIRECRAWL_KEY: ${{ secrets.FIRECRAWL_KEY }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: python main.py
-        Add GitHub Actions workflow for AI Tweet Bot
