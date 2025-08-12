@@ -32,7 +32,6 @@ SEARCH_QUERIES = [
 
 BASE_TRUSTED = [
     "medium.com",
-    "huggingface.co",
     "deeplearning.ai",
     "classcentral.com",
     "edx.org",
