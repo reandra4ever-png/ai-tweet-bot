@@ -22,4 +22,4 @@ jobs:
           FIRECRAWL_KEY: ${{ secrets.FIRECRAWL_KEY }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
-        run: python main_safe.py
+        run: python testy.py
