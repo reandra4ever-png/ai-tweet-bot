@@ -20,7 +20,9 @@ if not firecrawl_api_key or not serpapi_key:
 
 HISTORY_FILE = "tweet_history.json"
 TRUSTED_FILE = "trusted_domains.json"
-DAILY_NEW_DOMAIN_CAP = 3  # Max new domains per run
+BLACKLIST_FILE = "blacklist.json"  # New blacklist file
+DAILY_TWEET_CAP = 3  # Limit to 3 tweets per run
+MAX_URLS_PER_QUERY = 5  # Process up to 5 URLs per query
 
 SEARCH_QUERIES = [
     "Agentic AI",
@@ -32,10 +34,10 @@ SEARCH_QUERIES = [
 
 BASE_TRUSTED = [
     "medium.com",
+    "udemy.com",
     "deeplearning.ai",
     "classcentral.com",
     "edx.org",
-    "udemy.com",
     "coursera.org",
     "towardsdatascience.com",
     "ai.googleblog.com",
@@ -66,6 +68,12 @@ def load_trusted():
 def save_trusted(domains):
     learned = [d for d in domains if d not in BASE_TRUSTED]
     save_json(TRUSTED_FILE, learned)
+
+def load_blacklist():
+    return load_json(BLACKLIST_FILE, [])
+
+def save_blacklist(domains):
+    save_json(BLACKLIST_FILE, domains)
 
 def crawl_url(single_url):
     api_url = "https://api.firecrawl.dev/v1/crawl"
@@ -133,42 +141,44 @@ def extract_domain(url):
     except:
         return ""
 
-def get_serpapi_results(query, trusted_domains):
-    url = "https://serpapi.com/search.json"
-    params = {"q": query, "api_key": serpapi_key, "num": 10}
+def get_serpapi_results(query, trusted_domains, blacklist):
+    api_url = f"https://serpapi.com/search.json?q={query}&api_key={serpapi_key}&num={MAX_URLS_PER_QUERY}"
+    urls = []
+    new_domains = set()
     try:
-        r = requests.get(url, params=params)
+        r = requests.get(api_url)
         r.raise_for_status()
         data = r.json()
-        urls = []
-        new_domains = set()
         for res in data.get("organic_results", []):
             link = res.get("link")
             if not link:
                 continue
             domain = extract_domain(link)
-            if domain in trusted_domains:
+            if (domain in trusted_domains and 
+                "reddit.com" not in domain and 
+                "youtube.com" not in domain and 
+                domain not in blacklist):
                 urls.append(link)
-            else:
-                print(f"✨ New candidate domain found: {domain}")
-                new_domains.add(domain)
-                urls.append(link)
-        return urls, new_domains
+                if domain not in trusted_domains:
+                    new_domains.add(domain)
     except Exception as e:
-        print(f"❌ SerpAPI error for '{query}': {e}")
-        return [], set()
+        print(f"❌ SerpAPI error for {query}: {e}")
+    return urls, new_domains
 
 def main():
     history = load_history()
     trusted_domains = load_trusted()
+    blacklist = load_blacklist()
     all_urls = []
     newly_trusted = set()
+    tweet_count = 0
 
     print(f"📋 Initial trusted domains: {trusted_domains}")
+    print(f"📋 Initial blacklist: {blacklist}")
 
     for q in SEARCH_QUERIES:
         print(f"🔎 Searching via SerpAPI: {q}")
-        urls, new_domains = get_serpapi_results(q, trusted_domains)
+        urls, new_domains = get_serpapi_results(q, trusted_domains, blacklist)
         print(f"   Found {len(urls)} links ({len(new_domains)} new domains)")
         all_urls.extend(urls)
         newly_trusted.update(new_domains)
@@ -183,13 +193,18 @@ def main():
         trusted_domains = sorted(set(trusted_domains))
         save_trusted(trusted_domains)
 
-    all_urls = list(set(all_urls))
+    all_urls = list(set(all_urls))[:MAX_URLS_PER_QUERY * len(SEARCH_QUERIES)]  # Cap total URLs
 
     for source in all_urls:
+        if tweet_count >= DAILY_TWEET_CAP:
+            print(f"⏹ Reached daily tweet cap of {DAILY_TWEET_CAP}")
+            break
+
         if source in history:
             print(f"⏭ Skipping duplicate from history: {source}")
             continue
 
+        domain = extract_domain(source)
         data = crawl_url(source)
         if not data or "data" not in data or not data["data"]:
             print(f"⚠ No crawl data for {source}, falling back to scrape...")
@@ -201,13 +216,17 @@ def main():
             if markdown:
                 entries = [{"title": "Scraped Content", "url": source, "content": markdown}]
             else:
+                if any(e.status_code == 429 for e in [crawl_url(source), scrape_url(source)]):
+                    print(f"🚫 Adding {domain} to blacklist due to 429 errors")
+                    blacklist.append(domain)
+                    save_blacklist(blacklist)
                 continue
 
         # Handle data["data"] type
         if isinstance(data["data"], list):
             entries = data["data"]
         elif isinstance(data["data"], dict):
-            entries = [data["data"]]  # Wrap dictionary in a list to iterate
+            entries = [data["data"]]
         elif isinstance(data["data"], str):
             entries = [{"title": "Scraped Content", "url": source, "content": data["data"]}]
         else:
@@ -219,7 +238,7 @@ def main():
             if isinstance(entry, dict):
                 page_title = entry.get("title", "Untitled")
                 page_url = entry.get("url", source)
-            else:  # Handle case where entry might be a string (unlikely now)
+            else:
                 page_title = "Scraped Content"
                 page_url = source
             if not page_url:
@@ -232,6 +251,9 @@ def main():
             print(f"📝 WOULD TWEET: {tweet_text}")
             history.append(page_url)
             save_history(history)
+            tweet_count += 1
+            if tweet_count >= DAILY_TWEET_CAP:
+                break
 
     print(f"[{datetime.now()}] ✅ Smart auto-updating safe mode run complete. No tweets sent.")
 
