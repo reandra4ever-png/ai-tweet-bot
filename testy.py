@@ -1,28 +1,28 @@
 import os
-import requests
 import json
 import random
 from datetime import datetime
 from urllib.parse import urlparse
+from scrapy.crawler import CrawlerProcess
+from scrapy.spiders import Spider
+from scrapy.http import Request
 
 print("🛡 SAFE MODE: Bot will not post to X")
-print("🚀 Starting Firecrawl + SerpAPI SMART-AUTO debug run...")
+print("🚀 Starting Scrapy + SerpAPI SMART-AUTO debug run...")
 
-firecrawl_api_key = os.getenv("FIRECRAWL_KEY")
 serpapi_key = os.getenv("SERPAPI_KEY")
 
-print("FIRECRAWL_KEY loaded:", bool(firecrawl_api_key))
 print("SERPAPI_KEY loaded:", bool(serpapi_key))
 
-if not firecrawl_api_key or not serpapi_key:
-    print("❌ ERROR: Missing FIRECRAWL_KEY or SERPAPI_KEY. Check GitHub Secrets.")
+if not serpapi_key:
+    print("❌ ERROR: Missing SERPAPI_KEY. Check GitHub Secrets.")
     exit(1)
 
 HISTORY_FILE = "tweet_history.json"
 TRUSTED_FILE = "trusted_domains.json"
-BLACKLIST_FILE = "blacklist.json"  # New blacklist file
-DAILY_TWEET_CAP = 6  # Limit to 3 tweets per run
-MAX_URLS_PER_QUERY = 10  # Process up to 5 URLs per query
+BLACKLIST_FILE = "blacklist.json"
+DAILY_TWEET_CAP = 3
+MAX_URLS_PER_QUERY = 5
 
 SEARCH_QUERIES = [
     "Agentic AI",
@@ -75,79 +75,6 @@ def load_blacklist():
 def save_blacklist(domains):
     save_json(BLACKLIST_FILE, domains)
 
-def crawl_url(single_url):
-    api_url = "https://api.firecrawl.dev/v1/crawl"
-    headers = {
-        "Authorization": f"Bearer {firecrawl_api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "url": single_url,
-        "maxDepth": 1,
-        "maxDiscoveryDepth": 1,
-        "crawlEntireDomain": False,
-        "allowExternalLinks": False,
-        "allowSubdomains": False,
-        "scrapeOptions": {
-            "onlyMainContent": True,
-            "removeBase64Images": True,
-            "blockAds": True,
-            "formats": ["markdown"]
-        }
-    }
-    try:
-        r = requests.post(api_url, json=payload, headers=headers)
-        print(f"🔍 Crawling {single_url} → status: {r.status_code}")
-        r.raise_for_status()
-        return r.json()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Crawl error for {single_url}: {e}")
-        return {"status_code": r.status_code if 'r' in locals() else 0}  # Return status for checking
-
-def scrape_url(single_url):
-    api_url = "https://api.firecrawl.dev/v1/scrape"
-    headers = {
-        "Authorization": f"Bearer {firecrawl_api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {"url": single_url, "formats": ["markdown"]}
-    try:
-        r = requests.post(api_url, json=payload, headers=headers)
-        print(f"🔍 Scraping {single_url} → status: {r.status_code}")
-        r.raise_for_status()
-        return r.json()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Scrape error for {single_url}: {e}")
-        return {"status_code": r.status_code if 'r' in locals() else 0}
-
-def scrape_url(single_url):
-    api_url = "https://api.firecrawl.dev/v1/scrape"
-    headers = {
-        "Authorization": f"Bearer {firecrawl_api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {"url": single_url, "formats": ["markdown"]}
-    try:
-        r = requests.post(api_url, json=payload, headers=headers)
-        print(f"🔍 Scraping {single_url} → status: {r.status_code}")
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        print(f"❌ Scrape error for {single_url}: {e}")
-        return {}
-
-def make_tweet(title, url):
-    prefixes = ["🚀", "📢", "🔥", "💡", "🎯", "🧠"]
-    templates = [
-        "{prefix} {title} {url}",
-        "{prefix} Check this out: {title} {url}",
-        "{prefix} New resource: {title} {url}",
-        "{prefix} Just found: {title} {url}",
-        "{prefix} Insight drop: {title} {url}"
-    ]
-    template = random.choice(templates)
-    return template.format(prefix=random.choice(prefixes), title=title.strip(), url=url)
-
 def extract_domain(url):
     try:
         domain = urlparse(url).netloc.lower()
@@ -181,6 +108,34 @@ def get_serpapi_results(query, trusted_domains, blacklist):
         print(f"❌ SerpAPI error for {query}: {e}")
     return urls, new_domains
 
+class SimpleSpider(Spider):
+    name = "simple"
+    custom_settings = {
+        "DOWNLOAD_TIMEOUT": 30,  # 30-second timeout
+        "USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+
+    def __init__(self, url=None, *args, **kwargs):
+        super(SimpleSpider, self).__init__(*args, **kwargs)
+        self.start_urls = [url] if url else []
+
+    def parse(self, response):
+        yield {
+            "title": response.css("title::text").get(default="Untitled").strip(),
+            "url": response.url,
+            "content": response.text[:1000]  # Limit content for brevity
+        }
+
+def scrape_url(single_url):
+    process = CrawlerProcess(settings={
+        "LOG_ENABLED": False,
+        "DOWNLOAD_DELAY": 2  # Avoid overloading sites
+    })
+    deferred = process.crawl(SimpleSpider, url=single_url)
+    process.start()
+    results = [item for item in deferred.result]
+    return {"data": results[0]} if results else {}
+
 def main():
     history = load_history()
     trusted_domains = load_trusted()
@@ -201,7 +156,6 @@ def main():
 
     print(f"🌐 Total unique URLs to process: {len(all_urls)}")
 
-    # Apply cap to new domains
     if newly_trusted:
         limited_new = sorted(list(newly_trusted))[:DAILY_NEW_DOMAIN_CAP]
         print(f"🧠 Learning {len(limited_new)} new domains today: {limited_new}")
@@ -209,7 +163,7 @@ def main():
         trusted_domains = sorted(set(trusted_domains))
         save_trusted(trusted_domains)
 
-    all_urls = list(set(all_urls))[:MAX_URLS_PER_QUERY * len(SEARCH_QUERIES)]  # Cap total URLs
+    all_urls = list(set(all_urls))[:MAX_URLS_PER_QUERY * len(SEARCH_QUERIES)]
 
     for source in all_urls:
         if tweet_count >= DAILY_TWEET_CAP:
@@ -221,39 +175,19 @@ def main():
             continue
 
         domain = extract_domain(source)
-        data = crawl_url(source)
+        data = scrape_url(source)
+
         if not data or "data" not in data or not data["data"]:
-            print(f"⚠ No crawl data for {source}, falling back to scrape...")
-            data = scrape_url(source)
-
-        if "data" not in data:
-            print(f"⚠ No usable data for {source}, checking markdown fallback...")
-            markdown = data.get("markdown", "")
-            if markdown:
-                entries = [{"title": "Scraped Content", "url": source, "content": markdown}]
-            else:
-                # Check for 429 status in crawl or scrape response
-                crawl_status = crawl_url(source).get("status_code", 0)
-                scrape_status = scrape_url(source).get("status_code", 0)
-                if crawl_status == 429 or scrape_status == 429:
-                    print(f"🚫 Adding {domain} to blacklist due to 429 errors")
-                    if domain not in blacklist:
-                        blacklist.append(domain)
-                        save_blacklist(blacklist)
-                continue
-
-        # Handle data["data"] type
-        if isinstance(data["data"], list):
-            entries = data["data"]
-        elif isinstance(data["data"], dict):
-            entries = [data["data"]]
-        elif isinstance(data["data"], str):
-            entries = [{"title": "Scraped Content", "url": source, "content": data["data"]}]
-        else:
-            print(f"⚠ Unexpected data type for {source}: {type(data['data'])}")
+            print(f"⚠ No scrape data for {source}, skipping...")
+            if any("429" in str(e) for e in [scrape_url(source)]):  # Simplified 429 check
+                print(f"🚫 Adding {domain} to blacklist due to 429 errors")
+                if domain not in blacklist:
+                    blacklist.append(domain)
+                    save_blacklist(blacklist)
             continue
 
-        # Process each entry
+        entries = data["data"] if isinstance(data["data"], list) else [data["data"]]
+
         for entry in entries:
             if isinstance(entry, dict):
                 page_title = entry.get("title", "Untitled")
@@ -264,7 +198,7 @@ def main():
             if not page_url:
                 continue
 
-            tweet_text = make_tweet(page_title, page_url)
+            tweet_text = f"{random.choice(['🚀', '📢', '🔥', '💡', '🎯', '🧠'])} {page_title} {page_url}"
             if len(tweet_text) > 280:
                 tweet_text = tweet_text[:277] + "..."
 
