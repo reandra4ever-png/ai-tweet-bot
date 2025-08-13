@@ -21,8 +21,8 @@ if not firecrawl_api_key or not serpapi_key:
 HISTORY_FILE = "tweet_history.json"
 TRUSTED_FILE = "trusted_domains.json"
 BLACKLIST_FILE = "blacklist.json"  # New blacklist file
-DAILY_TWEET_CAP = 3  # Limit to 3 tweets per run
-MAX_URLS_PER_QUERY = 5  # Process up to 5 URLs per query
+DAILY_TWEET_CAP = 6  # Limit to 3 tweets per run
+MAX_URLS_PER_QUERY = 10  # Process up to 5 URLs per query
 
 SEARCH_QUERIES = [
     "Agentic AI",
@@ -100,9 +100,25 @@ def crawl_url(single_url):
         print(f"🔍 Crawling {single_url} → status: {r.status_code}")
         r.raise_for_status()
         return r.json()
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"❌ Crawl error for {single_url}: {e}")
-        return {}
+        return {"status_code": r.status_code if 'r' in locals() else 0}  # Return status for checking
+
+def scrape_url(single_url):
+    api_url = "https://api.firecrawl.dev/v1/scrape"
+    headers = {
+        "Authorization": f"Bearer {firecrawl_api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {"url": single_url, "formats": ["markdown"]}
+    try:
+        r = requests.post(api_url, json=payload, headers=headers)
+        print(f"🔍 Scraping {single_url} → status: {r.status_code}")
+        r.raise_for_status()
+        return r.json()
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Scrape error for {single_url}: {e}")
+        return {"status_code": r.status_code if 'r' in locals() else 0}
 
 def scrape_url(single_url):
     api_url = "https://api.firecrawl.dev/v1/scrape"
@@ -216,10 +232,14 @@ def main():
             if markdown:
                 entries = [{"title": "Scraped Content", "url": source, "content": markdown}]
             else:
-                if any(e.status_code == 429 for e in [crawl_url(source), scrape_url(source)]):
+                # Check for 429 status in crawl or scrape response
+                crawl_status = crawl_url(source).get("status_code", 0)
+                scrape_status = scrape_url(source).get("status_code", 0)
+                if crawl_status == 429 or scrape_status == 429:
                     print(f"🚫 Adding {domain} to blacklist due to 429 errors")
-                    blacklist.append(domain)
-                    save_blacklist(blacklist)
+                    if domain not in blacklist:
+                        blacklist.append(domain)
+                        save_blacklist(blacklist)
                 continue
 
         # Handle data["data"] type
