@@ -134,26 +134,15 @@ def extract_domain(url):
         return ""
 
 def get_serpapi_results(query, trusted_domains):
-    url = "https://serpapi.com/search.json"
-    params = {"q": query, "api_key": serpapi_key, "num": 10}
-    try:
-        r = requests.get(url, params=params)
-        r.raise_for_status()
-        data = r.json()
-        urls = []
-        new_domains = set()
-        for res in data.get("organic_results", []):
-            link = res.get("link")
-            if not link:
-                continue
-            domain = extract_domain(link)
-            if domain in trusted_domains:
-                urls.append(link)
-            else:
-                print(f"✨ New candidate domain found: {domain}")
-                new_domains.add(domain)
-                urls.append(link)
-        return urls, new_domains
+    # ... (existing code)
+    for res in data.get("organic_results", []):
+        link = res.get("link")
+        if not link:
+            continue
+        domain = extract_domain(link)
+        if domain in trusted_domains:  # Only include trusted domains
+            urls.append(link)
+    return urls, set()  # No new domains
     except Exception as e:
         print(f"❌ SerpAPI error for '{query}': {e}")
         return [], set()
@@ -206,6 +195,8 @@ def main():
         # Handle data["data"] type
         if isinstance(data["data"], list):
             entries = data["data"]
+        elif isinstance(data["data"], dict):
+            entries = [data["data"]]  # Wrap dictionary in a list to iterate
         elif isinstance(data["data"], str):
             entries = [{"title": "Scraped Content", "url": source, "content": data["data"]}]
         else:
@@ -217,7 +208,7 @@ def main():
             if isinstance(entry, dict):
                 page_title = entry.get("title", "Untitled")
                 page_url = entry.get("url", source)
-            else:  # Handle case where entry might be a string (unlikely now, but safe)
+            else:  # Handle case where entry might be a string (unlikely now)
                 page_title = "Scraped Content"
                 page_url = source
             if not page_url:
